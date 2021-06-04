@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "613830936436",
+    "project_id": "fall-odu",
+    "storage_bucket": "fall-odu.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:613830936436:android:66baa294693649fa290e21",
+        "android_client_info": {
+          "package_name": "com.jeevan.fall"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "613830936436-k440vqb3d988bnj4ghsqjq78eheflgu1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.jeevan.fall",
+            "certificate_hash": "965e800cab527892a2c0e6518bdbbadb43c6bc84"
+          }
+        },
+        {
+          "client_id": "613830936436-d9ul9koiu1v4fu6ftj7rd7ha6mjto0cq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCciS5yNBejoTsU06QvgyrC9g3ElMnGuWo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "613830936436-d9ul9koiu1v4fu6ftj7rd7ha6mjto0cq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
