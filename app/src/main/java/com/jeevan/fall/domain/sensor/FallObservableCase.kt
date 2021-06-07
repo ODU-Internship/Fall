@@ -2,15 +2,17 @@ package com.jeevan.fall.domain.sensor
 
 import com.google.common.collect.EvictingQueue
 import com.jeevan.fall.data.sensor.SensorRepository
+import com.jeevan.fall.data.sensor.models.FallLevel
 import com.jeevan.fall.di.IoDispatcher
 import com.jeevan.fall.domain.FlowUseCase
 import com.jeevan.fall.util.Result
 import com.jeevan.fall.util.SENSOR_SAMPLE_RATE
 import com.jeevan.fall.util.data
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import javax.inject.Inject
-import kotlin.math.max
+import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -24,7 +26,7 @@ import kotlin.math.sqrt
 class FallObservableCase @Inject constructor(
     @IoDispatcher dispatcher: CoroutineDispatcher,
     private val repository: SensorRepository
-) : FlowUseCase<Unit, Boolean>(dispatcher) {
+) : FlowUseCase<Unit, FallLevel>(dispatcher) {
 
     /**
      * Circular buffer to maintain last 3 second values of the gyro to predict max and min
@@ -33,14 +35,19 @@ class FallObservableCase @Inject constructor(
         EvictingQueue.create((1000L / SENSOR_SAMPLE_RATE * 3).toInt())
     private val gyroLast: EvictingQueue<Float> =
         EvictingQueue.create((1000L / SENSOR_SAMPLE_RATE * 3).toInt())
+    private val rotLast: EvictingQueue<Float> =
+        EvictingQueue.create((1000L / SENSOR_SAMPLE_RATE * 3).toInt())
 
     private val aMax get() = acclLast.maxOrNull() ?: 0F
     private val aMin get() = acclLast.minOrNull() ?: 0F
     private val gMax get() = gyroLast.maxOrNull() ?: 0F
     private val gMin get() = gyroLast.minOrNull() ?: 0F
+    private val rMax get() = rotLast.maxOrNull() ?: 0F
+    private val rMin get() = rotLast.minOrNull() ?: 0F
 
 
-    override fun execute(parameters: Unit): Flow<Result<Boolean>> {
+    @FlowPreview
+    override fun execute(parameters: Unit): Flow<Result<FallLevel>> {
         return try {
             val acclFlow = repository.getAccelerometerData()
                 .sample(SENSOR_SAMPLE_RATE)
@@ -49,7 +56,7 @@ class FallObservableCase @Inject constructor(
                         val (x, y, z) = it
                         sqrt(x.pow(2) + y.pow(2) + z.pow(2))
                     } ?: 0F
-                }
+                }.cancellable()
             val gyroFlow = repository.getGyroscopeData()
                 .sample(SENSOR_SAMPLE_RATE)
                 .map {
@@ -57,29 +64,37 @@ class FallObservableCase @Inject constructor(
                         val (x, y, z) = it
                         sqrt(x.pow(2) + y.pow(2) + z.pow(2))
                     } ?: 0F
+                }.cancellable()
+            val rotFlow = repository.getRotationVectorData()
+                .sample(SENSOR_SAMPLE_RATE)
+                .map {
+                    it.data?.let {
+                        val (x, y, z) = it
+                        sqrt(x.pow(2) + y.pow(2) + z.pow(2))
+                    } ?: 0F
                 }
+                .cancellable()
 
-            return acclFlow.combine(gyroFlow) { accl, gyro ->
+            return combine(acclFlow, gyroFlow, rotFlow) { accl, gyro, rot ->
                 acclLast.add(accl)
                 gyroLast.add(gyro)
-                val (angX, angY, angZ) = repository.getRotationVectorData().first().data
-                    ?: floatArrayOf(0F, 0F, 0F)
+                rotLast.add(rot)
+
                 if (accl < tM) {
-                    return@combine false
+                    return@combine FallLevel.None
                 }
                 return@combine if ((aMax - aMin) > tAt && (gMax - gMin) > tGt) {
-                    max(angX, max(angY, angZ)) > tI
-                } else false
+                    if (abs(rMax - rMin) < 0.12) FallLevel.Change else FallLevel.Fall
+                } else FallLevel.None
             }.map { Result.Success(it) }
         } catch (e: Exception) {
-            emptyFlow()
+            throw e
         }
     }
 
     companion object {
-        const val tAt = 8.2F
-        const val tGt = 6F
-        const val tI = 0.6F
-        const val tM = 9F
+        const val tAt = 7.2F
+        const val tGt = 4F
+        const val tM = 4F
     }
 }
